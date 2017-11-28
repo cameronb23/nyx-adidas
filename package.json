@@ -1,0 +1,26 @@
+{
+  "name": "nyx-adidas",
+  "version": "0.0.3",
+  "description": "A fully featured, multi-threaded, adidas Splash bot",
+  "main": "index.js",
+  "author": "cameronb23",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "flow": "flow; test $? -eq 0 -o $? -eq 2"
+  },
+  "devDependencies": {
+    "babel-loader": "^7.1.2",
+    "babel-preset-env": "^1.6.1",
+    "babel-register": "^6.26.0",
+    "flow-bin": "^0.59.0",
+    "webpack": "^3.8.1"
+  },
+  "dependencies": {
+    "babel-preset-flow": "^6.23.0",
+    "cheerio": "^1.0.0-rc.2",
+    "request": "^2.83.0",
+    "request-promise": "^4.2.2",
+    "tough-cookie": "^2.3.3"
+  }
+}
