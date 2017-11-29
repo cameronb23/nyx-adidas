@@ -5,8 +5,7 @@ import { Cookie } from 'tough-cookie';
 
 const instances = [];
 
-async function refresh(url: string, cookieJar: ?Object, userAgent: string) {
-
+async function refreshPage(url: string, cookieJar: ?Object, userAgent: string) {
   if (cookieJar == null) {
     cookieJar = request.jar();
   }
@@ -33,24 +32,31 @@ async function refresh(url: string, cookieJar: ?Object, userAgent: string) {
       throw new Error(`Server responded with non-normal status code of ${res.statusCode}`);
     }
 
-    let newCookies;
+    // Try parsing Cookies from the response headers
+    try {
+      let newCookies;
 
-    if (res.headers['set-cookie'] instanceof Array) {
-      newCookies = res.headers['set-cookie'].map(Cookie.parse);
-    } else {
-      newCookies = [Cookie.parse(res.headers['set-cookie'])];
+      if (res.headers['set-cookie'] instanceof Array) {
+        newCookies = res.headers['set-cookie'].map(Cookie.parse);
+      } else {
+        newCookies = [Cookie.parse(res.headers['set-cookie'])];
+      }
+
+      if (newCookies.filter(c => c.value.includes('hmac')).length > 0) {
+        return true;
+      }
+    } catch (e) {
+      console.log('Error parsing new cookies from headers..');
     }
 
-    if (newCookies.filter(c => c.value.includes('hmac')).length > 0) {
-      return true;
-    }
-
+    // if not found, check the cookie jar (incase we missed something?)
     const cookies = cookieJar.getCookies(url);
     
     if (cookies.filter(c => c.value.includes('hmac')).length > 0) {
       return true;
     }
 
+    // finally, attempt to locate captcha as last resort.
     const $ = cheerio.load(res.body);
 
     if ($('.g-recaptcha').length > 0) {
