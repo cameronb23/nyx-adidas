@@ -5,6 +5,89 @@ import { Cookie } from 'tough-cookie';
 
 const instances = [];
 
+type Region = {
+  domain: string,
+  locale: string,
+  siteStr: string
+};
+
+// https://www.adidas.com/on/demandware.store/Sites-adidas-US-Site/en_US/Product-Show?pid=%20AH2203
+
+async function getHmacImage(cookieJar: Object, userAgent: string) {
+  const opts = {
+    url: 'http://adidas.com/ru/apps/yeezy',
+    method: 'GET',
+    headers: {
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',     
+      Host: 'www.adidas.com',
+      'Accept-Encoding': 'gzip, deflate',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'User-Agent': userAgent
+    },
+    jar: cookieJar,
+    transform: (body) => {
+      return cheerio.load(body);
+    }
+  }
+
+  try {
+    const $ = request(opts);
+    
+
+  } catch (e) {
+    console.log('Error making request.');
+    return null;
+  }
+}
+
+async function updateBagCart(prodCode: string, cookieJar: Object, userAgent: string, region: Region) {
+  const opts = {
+    url: `https://www.adidas.${region.domain}/on/demandware.store/Sites-adidas-${region.siteStr}-Site/${region.locale}/Cart-Show`,
+    method: 'GET',
+    headers: {
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',     
+      Host: 'www.adidas.com',
+      'Accept-Encoding': 'gzip, deflate',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'User-Agent': userAgent
+    },
+    jar: cookieJar
+  }
+
+  try {
+    const bagRes = await request(opts);
+
+    opts.url = `https://www.adidas.${region.domain}/on/demandware.store/Sites-adidas-${region.siteStr}-Site/${region.locale}/Cart-UpdateItems?qty_0=1&pid_0=%00${prodCode}%00`;
+
+    const updateRes = await request(opts);
+
+    opts.url = `https://www.adidas.${region.domain}/on/demandware.store/Sites-adidas-${region.siteStr}-Site/${region.locale}/Cart-ProductCount`;
+
+    const finalBagRes = await request(opts);
+
+    console.log(finalBagRes);
+  } catch (e) {
+    return false;
+  }
+}
+
+const cookies = [];
+
+function start() {
+  for(let i = 0; i < 20; i++) {
+    cookies[i] = request.jar();
+    setInterval(async () => {
+      const jar = cookies[i];
+
+      const passed = await refreshPage('http://www.adidas.com/uk/apps/yeezy', jar, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36');
+
+      if (passed) {
+        const cook = jar.getCookies('http://www.adidas.com')
+      }
+    }, 10000);
+  }
+}
+
 async function refreshPage(url: string, cookieJar: ?Object, userAgent: string) {
   if (cookieJar == null) {
     cookieJar = request.jar();
