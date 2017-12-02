@@ -1,8 +1,7 @@
-type Region = {
-  domain: string,
-  locale: string,
-  siteStr: string
-};
+import type { Region, SplashParams } from './globals';
+
+
+// https://www.adidas.com/on/demandware.store/Sites-adidas-US-Site/en_US/Cart-AddExternal?quantity=1&pid=S82021_640
 
 class CartTask {
 
@@ -10,12 +9,14 @@ class CartTask {
   cookieJar: Object;
   userAgent: string;
   region: Region;
+  splash: SplashParams;
 
-  constructor(pid: string, cookieJar: Object, userAgent: string, region: Region) {
+  constructor(pid: string, cookieJar: Object, userAgent: string, region: Region, params: SplashParams) {
     this.pid = pid;
     this.cookieJar = cookieJar;
     this.userAgent = userAgent;
     this.region = region;
+    this.splash = params;
 
     this.run();
   }
@@ -34,7 +35,32 @@ class CartTask {
   }
 
   async loadPage() {
+    const opts = {
+      url: `http://www.adidas.${this.region.domain}/${this.region.microSiteLocation}/apps/yeezy/`,
+      method: 'GET',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        Host: 'www.adidas.com',
+        'Accept-Encoding': 'gzip, deflate',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': this.userAgent
+      },
+      jar: this.cookieJar,
+      simple: false,
+      resolveWithFullResponse: true
+    };
 
+    try {
+      const res = await request(opts);
+
+      if (res.statusCode !== 200) {
+        throw new Error(`Server responded with non-normal status code of ${res.statusCode}`);
+      }
+
+      const $ = cheerio.load(res);
+    } catch (e) {
+      throw new Error(`Error loading Splash page: ${e}`);
+    }
   }
 
   async atc(captchaResponse: string, captchaDuplicate: string, clientId: string) {
