@@ -13,7 +13,7 @@ import prompt from 'prompt';
 // TASKS
 const modes = [
   {
-    description: "Product Mode",
+    description: 'Product Mode',
     run: () => {
       prompt.get(['taskCount', 'pid'], (err, res) => {
         console.log(res);
@@ -21,9 +21,9 @@ const modes = [
     }
   },
   {
-    description: "Yeezy Splash Mode",
+    description: 'Yeezy Splash Mode',
     run: () => {
-      
+
     }
   }
 ];

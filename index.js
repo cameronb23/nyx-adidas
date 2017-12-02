@@ -1,2 +1,4 @@
 require('babel-register');
-require('./app');
+require("babel-polyfill");
+//require('./app');
+require('./splash');
