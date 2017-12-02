@@ -63,11 +63,12 @@ class CartTask {
     }
   }
 
-  async atc(captchaResponse: string, captchaDuplicate: string, clientId: string) {
-    const base_url =
-                    `http://www.adidas.${this.region.domain}` +
-                    `/on/demandware.store/Sites-adidas-${this.region.siteStr}-Site/${this.region.locale}` +
-                    `/Cart-MiniAddProduct`;
+  async atc(captchaResponse: string) {
+    const baseUrl = `http://www.adidas.${this.region.domain}/on/demandware.store/Sites-adidas-${this.region.siteStr}-Site/${this.region.locale}`;
+
+    const atcUrl = baseUrl += '/Cart-MiniAddProduct';
+
+    const cartCountUrl = baseUrl += '/Cart-ProductCount';
 
     const data = {
       masterPid: this.pid.split('_')[0], // only style
@@ -82,12 +83,12 @@ class CartTask {
       data['g-recaptcha-response'] = captchaResponse;
     }
 
-    if (captchaDuplicate) {
-      data[captchaDuplicate] = captchaResponse;
+    if (this.splash.captchaDuplicate) {
+      data[this.splash.captchaDuplicate] = captchaResponse;
     }
 
-    if (clientId) {
-      base_url += `?clientId=${clientId}`;
+    if (this.splash.clientId) {
+      atcUrl += `?clientId=${this.splash.clientId}`;
     }
 
     try {

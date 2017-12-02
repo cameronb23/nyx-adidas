@@ -2,6 +2,7 @@ import request from 'request-promise';
 import cheerio from 'cheerio';
 import { Cookie } from 'tough-cookie';
 
+import CartTask from './cart-task';
 import type { Region } from './globals';
 
 export default class SplashTask {
@@ -34,6 +35,8 @@ export default class SplashTask {
         if (passed) {
           clearInterval(this.timerId);
           console.log(`(${this.id}) PASSED SPLASH: ${JSON.stringify(passed)}`);
+          // TODO: change
+          new CartTask('AH2203_640', this.cookies, this.userAgent, this.region, passed);
           this.successCallback();
         }
       } catch (e) {
@@ -46,7 +49,7 @@ export default class SplashTask {
     if (url.startsWith('/')) {
       url = `http://cartchefs.co.uk${url}`;
     }
-    
+
     const opts = {
       url,
       method: 'GET',
@@ -119,11 +122,11 @@ export default class SplashTask {
           console.log('Error parsing new cookies from headers..');
         }
       }
-      
+
       if (!passed) {
         // if not found, check the cookie jar (incase we missed something?)
         const cookies = this.cookies.getCookies(this.url);
-  
+
         if (cookies.filter(c => c.value.includes('hmac')).length > 0) {
           passed = 'COOKIEJAR';
         }
@@ -163,17 +166,21 @@ export default class SplashTask {
           appJs = appJs.substring(2, appJs.length);
         }
 
-        const jsBody = await this.req(appJs);
         let captchaDuplicate = null;
+        try  {
+          const jsBody = await this.req(appJs);
 
-        if (jsBody !== null) {
-          const el = jsBody.split('append(\'')[1].split('\');')[0];
+          if (jsBody !== null) {
+            const el = jsBody.split('append(\'')[1].split('\');')[0];
 
-          console.log(el);
+            console.log(el);
 
-          captchaDuplicate = el.split('name="')[1].split('"')[0];
+            captchaDuplicate = el.split('name="')[1].split('"')[0];
 
-          console.log(captchaDuplicate);
+            console.log(captchaDuplicate);
+          }
+        } catch (e) {
+          console.log('Error requesting captcha duplicate: ', e.statusCode);
         }
 
         return {
