@@ -76,9 +76,9 @@ const pendingTasks = [];
 const successfulTasks = [];
 
 function start() {
-  console.log('Launching 20 tasks');
+  console.log('Launching 300 tasks');
 
-  for(let i = 0; i < 20; i++) {
+  for(let i = 0; i < 300; i++) {
     const jar = request.jar();
     const t = new SplashTask(i, 'http://cartchefs.co.uk/splash_test', jar, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36', () => {
       pendingTasks.slice(pendingTasks.indexOf(t), 1);

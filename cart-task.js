@@ -66,9 +66,9 @@ class CartTask {
   async atc(captchaResponse: string) {
     const baseUrl = `http://www.adidas.${this.region.domain}/on/demandware.store/Sites-adidas-${this.region.siteStr}-Site/${this.region.locale}`;
 
-    const atcUrl = baseUrl += '/Cart-MiniAddProduct';
+    let atcUrl = baseUrl + '/Cart-MiniAddProduct';
 
-    const cartCountUrl = baseUrl += '/Cart-ProductCount';
+    const cartCountUrl = baseUrl + '/Cart-ProductCount';
 
     const data = {
       masterPid: this.pid.split('_')[0], // only style
