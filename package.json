@@ -7,7 +7,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "start": "node index.js",
+    "start": "node --max-old-space-size=3072 index.js",
     "flow": "flow; test $? -eq 0 -o $? -eq 2"
   },
   "devDependencies": {
@@ -25,6 +25,7 @@
     "chalk": "^2.3.0",
     "cheerio": "^1.0.0-rc.2",
     "cli-spinner": "^0.2.7",
+    "cookie": "^0.3.1",
     "ejs": "^2.5.7",
     "express": "^4.16.2",
     "moment": "^2.19.3",
@@ -32,6 +33,7 @@
     "node-random-name": "^1.0.1",
     "prompt": "^1.0.0",
     "request": "^2.83.0",
+    "request-cookies": "^1.1.0",
     "request-promise": "^4.2.2",
     "tough-cookie": "^2.3.3"
   }

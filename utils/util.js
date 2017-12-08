@@ -91,14 +91,30 @@ export function getSizeCode(size: string) {
   }
 }
 
-export function buildHeaders(url: string, userAgent: string) {
+export function buildHeaders(url: string, cookieJar: Object, userAgent: string) {
   return {
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-    Host: (url.includes('cartchefs') ? 'cartchefs.co.uk' : 'www.adidas.com'),
+    Host: (url.includes('staging') ? 'www.staging.adidas.com' : 'www.adidas.com'),
     Connection: 'keep-alive',
+    DNT: 1,
     'Accept-Encoding': 'gzip, deflate',
     'Accept-Language': 'en-US,en;q=0.9',
     'User-Agent': userAgent,
-    'Cache-Control': 'max-age=0'
+    'Cache-Control': 'max-age=0',
+    'Upgrade-Insecure-Requests': 1
   };
+  //
+  // return new Promise(resolve => {
+  //   try {
+  //     const cookies = cookieJar.getCookiesSync(url);
+  //
+  //     if (cookies !== '') {
+  //       data.Cookie = cookies;
+  //     }
+  //
+  //     return resolve(data);
+  //   } catch (e) {
+  //     return resolve(data);
+  //   }
+  // });
 }

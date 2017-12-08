@@ -2,7 +2,9 @@ import request from 'request-promise';
 import cheerio from 'cheerio';
 import chalk from 'chalk';
 import moment from 'moment';
-import { Cookie } from 'tough-cookie';
+// import { Cookie, CookieJar } from 'request-cookies';
+import CookieParser from 'cookie';
+import { Cookie, CookieJar } from 'tough-cookie';
 
 import CartTask from './cart-task';
 import type { Region, SplashOptions } from '../globals';
@@ -49,15 +51,13 @@ function parseCookieHeader(headers: Object) {
 
   if (headers['set-cookie'] instanceof Array) {
     newCookies = headers['set-cookie'].map(Cookie.parse);
+    // newCookies = headers['set-cookie'].map((el) => new Cookie(el))
   } else {
     newCookies = [Cookie.parse(headers['set-cookie'])];
+    // newCookies = [new Cookie(headers['set-cookie'])];
   }
 
-  if (newCookies.filter(c => isHmac(c)).length > 0) {
-    return true;
-  }
-
-  return false;
+  return newCookies;
 }
 
 const QUOTE_MATCH = /(["'])(?:(?=(\\?))\2.)*?\1/g;
@@ -118,6 +118,7 @@ export default class SplashTask {
   id: Number;
   options: SplashOptions;
   cookies: Object;
+  cookieSet: Object;
   url: string;
   successCallback: Function;
   timerId: string;
@@ -128,22 +129,25 @@ export default class SplashTask {
   ) {
     this.options = options;
     this.id = options.id;
+    this.cookieSet = {};
     this.cookies = request.jar();
+    this.cookies._jar.rejectPublicSuffixes = false;
+    // this.cookies = new CookieJar();
     if (options.test) {
-      this.url = 'http://cartchefs.co.uk/splash_test';
+      this.url = 'http://www.staging.adidas.com/us/apps/yeezy';
     } else {
       this.url = `http://www.adidas.com/${region.microSiteLocation}/apps/yeezy`;
     }
     this.successCallback = successCallback;
 
-    this.startTimer();
     this.run();
+    this.startTimer();
   }
 
   startTimer() {
     this.timerId = setInterval(async () => {
       await this.run();
-    }, 10000);
+    }, 60000);
   }
 
   async run() {
@@ -157,41 +161,87 @@ export default class SplashTask {
   }
 
   async refreshPage() {
+
+    const headers = buildHeaders(this.url, this.cookies, this.options.userAgent);
+
     const opts = {
       url: this.url,
       method: 'GET',
       gzip: true,
-      headers: buildHeaders(this.url, this.options.userAgent),
+      headers: Object.assign({}, headers, {
+        Referer: 'https://www.staging.adidas.com/us/apps/yeezy/'
+      }),
       proxy: this.options.proxy,
       jar: this.cookies,
       simple: false,
       resolveWithFullResponse: true
     };
 
+    if (Object.keys(this.cookieSet).length > 0) {
+      let cookieString;
+      let arr = Object.keys(this.cookieSet).map(k => CookieParser.serialize(k, this.cookieSet[k]));
+      opts.headers.Cookie = arr.join('; ');
+      console.log(opts.headers.Cookie);
+    }
+
     try {
       const res = await request(opts);
 
-      if (res.statusCode !== 200) {
-        logErr(`Server responded with non-normal status code of ${res.statusCode}`, true, this.id);
-        return null;
-      }
-
       let passed = null;
+
+      if (res.body.includes('<!-- ERR_CACHE_ACCESS_DENIED -->')) {
+        logErr('Proxy connection failed', true, this.id);
+        return;
+      }
 
       // Try parsing Cookies from the response headers
       if(res.headers['set-cookie'] !== null && res.headers['set-cookie'] !== undefined) {
         try {
-          if (parseCookieHeader(res.headers)) {
-            passed = 'COOKIE HEADER';
+
+          console.log(res.headers['set-cookie']);
+
+          const headerCookies = parseCookieHeader(res.headers);
+          const newCookies = {};
+
+          // EXTRACT TRACKING COOKIES FROM PAGE
+          if (res.body.includes('document.cookie')) {
+            const cookie = res.body.split('document.cookie')[1].split('"')[1].split('"')[0].split('=');
+            newCookies[cookie[0]] = cookie[1];
           }
+
+          headerCookies.forEach(c => newCookies[c.key] = c.value);
+
+          this.cookieSet = Object.assign({}, this.cookieSet, newCookies);
+
+          Object.keys(this.cookieSet).forEach(k => {
+            if (k.toLowerCase() === 'gceeqs' || this.cookieSet[k].toLowerCase().includes('hmac')) {
+              passed = 'COOKIE HEADER';
+            }
+          });
         } catch (e) {
+          console.log(e);
           logErr('Error parsing new cookies from headers', true, this.id);
         }
       }
 
+      if (res.statusCode === 401 && this.url.includes('staging')) {
+        logSuccess('[STAGING] Passed splash successfully', true, this.id);
+        return {
+          hmacMethod: 'STAGING',
+          sitekey: null,
+          captchaDuplicate: 'x-PrdRt',
+          clientId: null
+        };
+      }
+
+      if (res.statusCode !== 200 && !passed) {
+        logErr(`Server responded with non-normal status code of ${res.statusCode}`, true, this.id);
+        return null;
+      }
+
       if (!passed) {
         // if not found, check the cookie jar (incase we missed something?)
-        const cookies = this.cookies.getCookies(this.url);
+        const cookies = await this.cookies._jar.getCookiesSync(res.request.uri);
 
         if (cookies.filter(c => isHmac(c)).length > 0) {
           passed = 'COOKIEJAR';
@@ -241,7 +291,10 @@ export default class SplashTask {
         };
       }
 
-      log('Still on splash...', true, this.id);
+      // const cSet = await this.cookies._jar.getCookiesSync(res.request.uri, { allPaths: true });
+      // console.log(cSet);
+      const count = Object.keys(this.cookieSet).length;
+      log(`Still on splash... [${res.statusCode}][${res.headers['set-cookie'].length}][${count}]`, true, this.id);
       return null;
     } catch (e) {
       logErr(`Error loading Splash page: ${e.message}`, true, this.id);

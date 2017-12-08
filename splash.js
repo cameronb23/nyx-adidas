@@ -1,6 +1,7 @@
 // @flow
 import request from 'request-promise';
 import cheerio from 'cheerio';
+import async from 'async';
 import { Cookie } from 'tough-cookie';
 
 // local
@@ -74,9 +75,6 @@ async function updateBagCart(prodCode: string, cookieJar: Object, userAgent: str
   }
 }
 
-const pendingTasks = [];
-const successfulTasks = [];
-
 export async function startTasks(tasks: Array) {
   console.log('Loading proxies...');
 
@@ -88,6 +86,8 @@ export async function startTasks(tasks: Array) {
 
   console.log(`Launching set of ${tasks.length} tasks with ${proxyData.proxies.length} proxies.`);
 
+  const taskSet = [];
+
   for(let id = 0; id < tasks.length; id++) {
     const taskInfo = tasks[id];
     let proxy = null;
@@ -96,35 +96,34 @@ export async function startTasks(tasks: Array) {
       proxy = getRandom(proxyData.proxies);
     }
 
-    const task = new SplashTask({
-      id: (id + 1), // offset by one for looks
-      region: taskInfo.region,
-      size: taskInfo.size,
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
-      proxy,
-      test: taskInfo.testMode
-    }, (cookies: Object, params: SplashResultParams) => {
-      setSitekey(params.sitekey);
-      // initiate cart task
-      new CartTask({
-        id: (id + 1),
-        pid: taskInfo.pid,
+    taskSet.push(() => {
+      const task = new SplashTask({
+        id: (id + 1), // offset by one for looks
         region: taskInfo.region,
         size: taskInfo.size,
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
-        cookieJar: cookies,
-        proxy: proxy,
+        proxy,
         test: taskInfo.testMode
-      }, params, (cart) => {
-        sendDiscord(cart);
+      }, (cookies: Object, params: SplashResultParams) => {
+        setSitekey(params.sitekey);
+        // initiate cart task
+        new CartTask({
+          id: (id + 1),
+          pid: taskInfo.pid,
+          region: taskInfo.region,
+          size: taskInfo.size,
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
+          cookieJar: cookies,
+          proxy: proxy,
+          test: taskInfo.testMode
+        }, params, (cart) => {
+          sendDiscord(cart);
+        });
       });
-
-      pendingTasks.slice(pendingTasks.indexOf(task), 1);
-      successfulTasks.push(task);
     });
-
-    pendingTasks.push(task);
   }
+
+  async.parallel(taskSet);
 }
 
 // start();
