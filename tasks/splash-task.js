@@ -282,7 +282,7 @@ export default class SplashTask {
         return {
           hmacMethod: passed,
           sitekey,
-          captchaDuplicate: this.capDup ? this.capDup : 'not found', // x-PrdRt
+          captchaDuplicate: this.capDup ? this.capDup : null, // x-PrdRt
           clientId: cId
         };
       }

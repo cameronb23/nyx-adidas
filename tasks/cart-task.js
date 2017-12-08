@@ -20,13 +20,17 @@ export default class CartTask {
   timerId: string;
   cancel: Boolean;
   captcha: string;
+  sitekey: string;
   successCallback: Function;
 
   constructor(options: CartOptions, params: SplashResultParams, successCallback: Function) {
     this.id = options.id;
     this.options = options;
     this.cookies = options.cookieJar;
-    this.splash = params;
+    if (params) {
+      this.splash = params;
+      this.sitekey = params.sitekey;
+    }
     this.successCallback = successCallback;
 
     // parse size
@@ -39,7 +43,7 @@ export default class CartTask {
   }
 
   async start() {
-    if (this.splash.sitekey) {
+    if (this.sitekey) {
       log(chalk.yellow('Waiting for captcha...'), true, this.id);
       this.captcha = await this.getCaptcha();
       this.run();
@@ -68,7 +72,14 @@ export default class CartTask {
       return;
     }
 
-    const response = await this.atc(this.captcha ? this.captcha.token : null);
+    let response;
+
+    if (this.options.splash) {
+      response = await this.atc(this.captcha ? this.captcha.token : null);
+    } else {
+      response = await this.atcNew(this.captcha ? this.captcha.token : null);
+    }
+
     this.captcha = null;
 
     if (response) {
@@ -297,6 +308,97 @@ export default class CartTask {
     });
   }
 
+  async atcNew(captchaResponse: string) {
+    logSuccess('Attempting add to cart...', true, this.id);
+
+    const baseUrl = `http://www.adidas.${this.options.region.domain}`;
+
+    let atcUrl = baseUrl + `/api/cart_items?sitePath=${this.options.region.key.toLowerCase}`;
+
+    const data = {
+      clientCaptchaResponse: captchaResponse,
+      invalidFields: [],
+      isValidating: false,
+      product_id: this.pid.split('_')[0],
+      product_variation_sku: this.pid,
+      quantity: 1,
+      recipe: null,
+      size: this.options.size,
+    };
+
+    console.log(data);
+
+    const opts = {
+      url: atcUrl,
+      method: 'POST',
+      headers: {
+        Accept: '*/*',
+        Connection: 'keep-alive',
+        DNT: 1,
+        Host: 'www.adidas.com',
+        Origin: 'https://www.adidas.com',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Content-Type': 'application/json',
+        'User-Agent': this.options.userAgent
+      },
+      body: JSON.stringify(data),
+      json: true,
+      jar: this.cookies,
+      proxy: this.options.proxy,
+      simple: false,
+      resolveWithFullResponse: true
+    };
+
+    try {
+      const res = await request({
+        url: `${baseUrl}/${this.options.region.microSiteLocation.toLowerCase()}/cameron-is-washed/${this.pid.split('_')[0]}.html`,
+        method: 'GET',
+        headers: buildHeaders(baseUrl, this.options.userAgent),
+        jar: this.cookies,
+        proxy: this.options.proxy,
+        simple: false,
+        resolveWithFullResponse: true
+      });
+
+      console.log(res.request.uri.href);
+
+      opts.headers.Referer = res.request.uri.href;
+
+      console.log(opts.headers);
+
+      const response = await request(opts);
+
+      console.log(response.statusCode);
+      console.log(response.body);
+
+      if (response.statusCode === 401) {
+        return
+      }
+
+      if (response.statusCode !== 200) {
+        logErr(`Error carting: ${response.statusCode}`, true, this.id);
+        return false;
+      }
+
+      const data = response.body;
+
+      if (!data) {
+        logErr('Error carting: undefined error', true, this.id);
+        return false;
+      }
+
+      if (data.product_quantity < 1) {
+        logErr('Error carting: failed', true, this.id);
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      logErr(e, true, this.id);
+    }
+  }
+
   async atc(captchaResponse: string) {
     logSuccess('Attempting add to cart...', true, this.id);
 
@@ -343,6 +445,9 @@ export default class CartTask {
     try {
       const response = await request(opts);
 
+      console.log(response.statusCode);
+      console.log(response.body);
+
       if (response.statusCode === 401) {
         return
       }
@@ -360,6 +465,7 @@ export default class CartTask {
       }
 
       if (data.result !== 'SUCCESS') {
+        logErr('Error carting: oos/invalid captcha', true, this.id);
         return false;
       }
 

@@ -69,6 +69,7 @@ export type CartOptions = {
   size: string,
   userAgent: string,
   cookieJar: ?Object,
+  splash: Booean,
   proxy: string,
   test: Boolean
 };

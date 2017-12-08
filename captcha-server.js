@@ -5,7 +5,7 @@ import moment from 'moment';
 
 const expressApp = express();
 let expressServer;
-let sitekey = ''; // '6LdC0iQUAAAAAOYmRv34KSLDe-7DmQrUSYJH8eB_';
+let sitekey = '6LdC0iQUAAAAAOYmRv34KSLDe-7DmQrUSYJH8eB_';
 
 type Captcha = {
   token: string,
@@ -20,7 +20,7 @@ expressApp.set('view engine', 'ejs');
 
 expressApp.get('/', (req, res) => {
   res.render('harvester', {
-    sitekey
+    sitekey: sitekey
   });
 });
 
@@ -42,7 +42,9 @@ export default async function start() {
 }
 
 export function setSitekey(key) {
-  sitekey = key;
+  if(key) {
+    sitekey = key;
+  }
 }
 
 export function fetchCaptcha() {

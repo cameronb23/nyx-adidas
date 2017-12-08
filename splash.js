@@ -96,31 +96,51 @@ export async function startTasks(tasks: Array) {
       proxy = getRandom(proxyData.proxies);
     }
 
-    taskSet.push(() => {
-      const task = new SplashTask({
-        id: (id + 1), // offset by one for looks
-        region: taskInfo.region,
-        size: taskInfo.size,
-        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
-        proxy,
-        test: taskInfo.testMode
-      }, (cookies: Object, params: SplashResultParams) => {
-        setSitekey(params.sitekey);
-        // initiate cart task
+    if (taskInfo.splash) {
+      taskSet.push(() => {
+        const task = new SplashTask({
+          id: (id + 1), // offset by one for looks
+          region: taskInfo.region,
+          size: taskInfo.size,
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
+          proxy,
+          test: taskInfo.testMode
+        }, (cookies: Object, params: SplashResultParams) => {
+          setSitekey(params.sitekey);
+          // initiate cart task
+          new CartTask({
+            id: (id + 1),
+            pid: taskInfo.pid,
+            region: taskInfo.region,
+            size: taskInfo.size,
+            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
+            cookieJar: cookies,
+            proxy: proxy,
+            splash: taskInfo.splash,
+            test: taskInfo.testMode
+          }, params, (cart) => {
+            sendDiscord(cart);
+          });
+        });
+      });
+    } else {
+      taskSet.push(() => {
         new CartTask({
           id: (id + 1),
           pid: taskInfo.pid,
           region: taskInfo.region,
           size: taskInfo.size,
           userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
-          cookieJar: cookies,
+          cookieJar: request.jar(),
           proxy: proxy,
+          splash: taskInfo.splash,
           test: taskInfo.testMode
-        }, params, (cart) => {
+        }, null, (cart) => {
           sendDiscord(cart);
         });
-      });
-    });
+      })
+    }
+
   }
 
   async.parallel(taskSet);
