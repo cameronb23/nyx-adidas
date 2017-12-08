@@ -2,15 +2,17 @@
 import request from 'request-promise';
 import cheerio from 'cheerio';
 import { Cookie } from 'tough-cookie';
-import SplashTask from './splash-task';
+
+// local
+import type { Region, SplashOptions } from './globals';
+import { getRegion } from './globals';
+import { sendDiscord } from './utils/hooks';
+import { loadProxies, getRandom } from './utils/util';
+import { setSitekey } from './captcha-server';
+import CartTask from './tasks/cart-task';
+import SplashTask from './tasks/splash-task';
 
 const instances = [];
-
-type Region = {
-  domain: string,
-  locale: string,
-  siteStr: string
-};
 
 // https://www.adidas.com/on/demandware.store/Sites-adidas-US-Site/en_US/Product-Show?pid=%20AH2203
 
@@ -75,18 +77,54 @@ async function updateBagCart(prodCode: string, cookieJar: Object, userAgent: str
 const pendingTasks = [];
 const successfulTasks = [];
 
-function start() {
-  console.log('Launching 300 tasks');
+export async function startTasks(tasks: Array) {
+  console.log('Loading proxies...');
 
-  for(let i = 0; i < 300; i++) {
-    const jar = request.jar();
-    const t = new SplashTask(i, 'http://cartchefs.co.uk/splash_test', jar, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36', () => {
-      pendingTasks.slice(pendingTasks.indexOf(t), 1);
-      successfulTasks.push(t);
+  const proxyData = await loadProxies();
+
+  if (proxyData.failed.length > 0) {
+    proxyData.failed.forEach(p => console.log(`Failed to parse proxy: ${p}`));
+  }
+
+  console.log(`Launching set of ${tasks.length} tasks with ${proxyData.proxies.length} proxies.`);
+
+  for(let id = 0; id < tasks.length; id++) {
+    const taskInfo = tasks[id];
+    let proxy = null;
+
+    if (taskInfo.proxy) {
+      proxy = getRandom(proxyData.proxies);
+    }
+
+    const task = new SplashTask({
+      id: (id + 1), // offset by one for looks
+      region: taskInfo.region,
+      size: taskInfo.size,
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
+      proxy,
+      test: taskInfo.testMode
+    }, (cookies: Object, params: SplashResultParams) => {
+      setSitekey(params.sitekey);
+      // initiate cart task
+      new CartTask({
+        id: (id + 1),
+        pid: taskInfo.pid,
+        region: taskInfo.region,
+        size: taskInfo.size,
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36',
+        cookieJar: cookies,
+        proxy: proxy,
+        test: taskInfo.testMode
+      }, params, (cart) => {
+        sendDiscord(cart);
+      });
+
+      pendingTasks.slice(pendingTasks.indexOf(task), 1);
+      successfulTasks.push(task);
     });
 
-    pendingTasks.push(t);
+    pendingTasks.push(task);
   }
 }
 
-start();
+// start();

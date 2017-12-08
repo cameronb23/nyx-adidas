@@ -1,4 +1,4 @@
 require('babel-register');
 require("babel-polyfill");
-//require('./app');
-require('./hmac');
+require('./app');
+//require('./hmac');
