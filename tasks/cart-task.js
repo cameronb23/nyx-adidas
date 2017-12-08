@@ -77,8 +77,8 @@ export default class CartTask {
       // write cookies to file
       const cookieString = JSON.stringify(this.cookies);
 
-      const timeStamp = moment().format('hh-mm-ss');
-      const fileName = `(${this.options.size.replace('.', '-')}) ${timeStamp}.txt`;
+      const timeStamp = moment().format('hh-mm-ss-SSS');
+      const fileName = `${timeStamp}(${this.options.size.replace('.', '-')}).txt`;
 
       const domain = `http://www.adidas.${this.options.region.domain}`;
 

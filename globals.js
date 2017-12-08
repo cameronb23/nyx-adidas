@@ -57,9 +57,9 @@ export type Region = {
 
 export type SplashResultParams = {
   hmacMethod: string,
-  sitekey: string,
+  sitekey: ?string,
   captchaDuplicate: string,
-  clientId: string
+  clientId: ?string
 };
 
 export type CartOptions = {

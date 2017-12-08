@@ -13,7 +13,7 @@ import { log, logErr, logSuccess, buildHeaders } from '../utils/util';
 async function simpleRequest(url, cookies, taskOptions) {
   if (url.startsWith('/')) {
     if (taskOptions.test) {
-      url = `http://cartchefs.co.uk${url}`;
+      url = `http://staging.adidas.com${url}`;
     } else {
       url = `http://adidas.com${url}`;
     }
@@ -76,13 +76,6 @@ async function findCaptchaDuplicate($, cookies, taskOptions): ?string {
       // remove quotes
       appJs = jsMatches[0].substring(1, jsMatches[0].length - 1);
     }
-
-    // const src = $(el).attr('src');
-    // if (src !== undefined) {
-    //   if (src.includes('application.js')) {
-    //     appJs = src;
-    //   }
-    // }
   });
 
   if (appJs) {
@@ -99,12 +92,16 @@ async function findCaptchaDuplicate($, cookies, taskOptions): ?string {
 
       const jsBody = res.body;
 
-      if (jsBody) {
-        const el = jsBody.split('append(\'<input')[1].split('\');')[0];
+      try  {
+        if (jsBody) {
+          const el = jsBody.split('append(\'<input')[1].split('\');')[0];
 
-        const captchaDuplicate = el.split('name="')[1].split('"')[0];
+          const captchaDuplicate = el.split('name="')[1].split('"')[0];
 
-        return captchaDuplicate;
+          return captchaDuplicate;
+        }
+      } catch (e) {
+        return null;
       }
     } catch (e) {
       throw new Error(`Error fetching captcha duplicate: ${e.message}`);
@@ -122,6 +119,7 @@ export default class SplashTask {
   url: string;
   successCallback: Function;
   timerId: string;
+  capDup: string; // cached
 
   constructor(
     options: SplashOptions,
@@ -139,6 +137,8 @@ export default class SplashTask {
       this.url = `http://www.adidas.com/${region.microSiteLocation}/apps/yeezy`;
     }
     this.successCallback = successCallback;
+
+    this.capDup = null;
 
     this.run();
     this.startTimer();
@@ -161,7 +161,6 @@ export default class SplashTask {
   }
 
   async refreshPage() {
-
     const headers = buildHeaders(this.url, this.cookies, this.options.userAgent);
 
     const opts = {
@@ -169,7 +168,7 @@ export default class SplashTask {
       method: 'GET',
       gzip: true,
       headers: Object.assign({}, headers, {
-        Referer: 'https://www.staging.adidas.com/us/apps/yeezy/'
+        Referer: `https://www.${this.options.test ? 'staging.' : ''}adidas.com/${this.options.region.microSiteLocation}/apps/yeezy/`
       }),
       proxy: this.options.proxy,
       jar: this.cookies,
@@ -226,17 +225,12 @@ export default class SplashTask {
 
       if (res.statusCode === 401 && this.url.includes('staging')) {
         logSuccess('[STAGING] Passed splash successfully', true, this.id);
-        return {
-          hmacMethod: 'STAGING',
-          sitekey: null,
-          captchaDuplicate: 'x-PrdRt',
-          clientId: null
-        };
-      }
-
-      if (res.statusCode !== 200 && !passed) {
-        logErr(`Server responded with non-normal status code of ${res.statusCode}`, true, this.id);
-        return null;
+        passed = 'STAGING';
+      } else {
+        if (res.statusCode !== 200 && !passed) {
+          logErr(`Server responded with non-normal status code of ${res.statusCode}`, true, this.id);
+          return null;
+        }
       }
 
       if (!passed) {
@@ -259,9 +253,19 @@ export default class SplashTask {
         }
       }
 
+      try {
+        this.capDup = await findCaptchaDuplicate($, this.cookies, this.options);
+      } catch (e) {
+        console.log(e);
+      }
+
       if (passed) {
         // get client id
-        const cId = res.body.split('?clientId=')[1].split('"')[0];
+        let cId;
+
+        if (res.body.includes('?clientId=')) {
+          cId = res.body.split('?clientId=')[1].split('"')[0];
+        }
 
         if ($ == null) {
           $ = cheerio.load(res.body);
@@ -275,18 +279,10 @@ export default class SplashTask {
           sitekey = cap.attr('data-sitekey');
         }
 
-        let captchaDuplicate;
-
-        try {
-          captchaDuplicate = await findCaptchaDuplicate($, this.cookies, this.options);
-        } catch (e) {
-          console.log(e);
-        }
-
         return {
           hmacMethod: passed,
           sitekey,
-          captchaDuplicate: captchaDuplicate ? captchaDuplicate : 'x-PrdRt',
+          captchaDuplicate: this.capDup ? this.capDup : 'not found', // x-PrdRt
           clientId: cId
         };
       }
@@ -297,6 +293,7 @@ export default class SplashTask {
       log(`Still on splash... [${res.statusCode}][${res.headers['set-cookie'].length}][${count}]`, true, this.id);
       return null;
     } catch (e) {
+      console.log(e);
       logErr(`Error loading Splash page: ${e.message}`, true, this.id);
     }
   }
